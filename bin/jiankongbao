@@ -1,0 +1,31 @@
+#!/bin/bash
+
+ME="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+MEAT=$(dirname $ME)
+PASSWORD_FILE=$(dirname $MEAT)/password.txt
+
+#MySQL setting
+JIANKONGBAO_PASSWORD=$(</dev/urandom tr -dc A-Za-z0-9 | head -c8)
+MYSQLD_PASSWORD=$(grep "mysql:root:" $PASSWORD_FILE  | awk -F: '{print $3}')
+echo "CREATE USER 'jiankongbao'@'60.195.252.106' IDENTIFIED BY '"$JIANKONGBAO_PASSWORD"'" | /usr/local/mysql/bin/mysql -uroot -p$MYSQLD_PASSWORD -h127.0.0.1
+echo "CREATE USER 'jiankongbao'@'60.195.249.83' IDENTIFIED BY '"$JIANKONGBAO_PASSWORD"'" | /usr/local/mysql/bin/mysql -uroot -p$MYSQLD_PASSWORD -h127.0.0.1
+if [ $? -eq 0 ]; then
+    sed -i /mysql:jiankongbao:/d   $PASSWORD_FILE
+    echo "mysql:jiankongbao:"$JIANKONGBAO_PASSWORD >> $PASSWORD_FILE
+fi
+
+#/sbin/iptables security setting
+/sbin/iptables -D RH-Firewall-1-INPUT -j REJECT --reject-with icmp-host-prohibited
+/sbin/iptables -D RH-Firewall-1-INPUT -p udp -m state --state NEW -m udp -s 60.195.249.83 --dport 161 -j ACCEPT 
+/sbin/iptables -A RH-Firewall-1-INPUT -p udp -m state --state NEW -m udp -s 60.195.249.83 --dport 161 -j ACCEPT 
+/sbin/iptables -D RH-Firewall-1-INPUT -p udp -m state --state NEW -m udp -s 60.195.252.107 --dport 161 -j ACCEPT 
+/sbin/iptables -A RH-Firewall-1-INPUT -p udp -m state --state NEW -m udp -s 60.195.252.107 --dport 161 -j ACCEPT 
+/sbin/iptables -D RH-Firewall-1-INPUT -p udp -m state --state NEW -m udp -s 60.195.252.110 --dport 161 -j ACCEPT 
+/sbin/iptables -A RH-Firewall-1-INPUT -p udp -m state --state NEW -m udp -s 60.195.252.110 --dport 161 -j ACCEPT 
+/sbin/iptables -D RH-Firewall-1-INPUT -p tcp -s 60.195.252.106 --dport 3306 -j ACCEPT
+/sbin/iptables -A RH-Firewall-1-INPUT -p tcp -s 60.195.252.106 --dport 3306 -j ACCEPT
+/sbin/iptables -D RH-Firewall-1-INPUT -p tcp -s 60.195.249.83  --dport 3306 -j ACCEPT
+/sbin/iptables -A RH-Firewall-1-INPUT -p tcp -s 60.195.249.83  --dport 3306 -j ACCEPT
+/sbin/iptables -A RH-Firewall-1-INPUT -j REJECT --reject-with icmp-host-prohibited
+service iptables save
+service iptables restart

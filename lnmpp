@@ -1,0 +1,163 @@
+#!/usr/bin/env python
+
+#encoding=utf-8
+
+
+import urllib2
+from Queue import Queue
+import time
+import socket
+import pickle as obj_pickle
+from sgmllib import SGMLParser
+from optparse import OptionParser
+import os
+import sys
+import subprocess
+
+
+socket.setdefaulttimeout(60)
+
+
+def main():
+	usage = "usage: %prog [options] arg"  
+	parser = OptionParser(usage)  
+	
+
+	parser.add_option("-v", "--version", action="store_true", dest="version",help="Show current version")  
+	parser.add_option("-u", "--update", action="store_true", dest="update", help="update local version database")
+	parser.add_option("-i", "--install", action="store_true", dest="install", help="install specified package") 
+	parser.add_option("-s", "--search", action="store_true", dest="search", help="search specified package")  
+	parser.add_option("-l", "--list", action="store_true", dest="list", help="list all package") 
+
+
+	(options, args) = parser.parse_args()  
+	
+
+	obj_lnmpp = lnmpp()
+	#f.get_list()
+	if not os.path.isfile(obj_lnmpp.dbfile) and not options.update:
+		print "please run update first"
+		return
+
+	if options.version:
+		print obj_lnmpp.get_version()
+
+
+	if options.update:
+		obj_lnmpp.update()
+
+	if options.list:
+		for item in obj_lnmpp.get_list():
+			print item
+
+	if options.install:
+		pkg_name = args[0]
+		raw_pkg_name = pkg_name[0:pkg_name.index('-')]
+		print "install %s ....." % pkg_name
+		cmd = "curl %s%s/%s.sh | sh" % (obj_lnmpp.res,raw_pkg_name,pkg_name)
+		print cmd
+		#p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		#for line in p.stdout.readlines():
+		#	print line,
+		#retval = p.wait()
+		os.system(cmd)
+
+	if options.search:
+		pkg_name = args[0]
+		pkg_list = obj_lnmpp.search(pkg_name)
+		if not len(pkg_list) > 0 :
+			print "%s not found" % pkg_name
+		print ""
+		for item in pkg_list:
+
+			print item[:-3]
+
+class lnmpp:
+	def __init__(self):
+
+		self.res = "http://lnmpp.googlecode.com/svn/trunk/lib/"
+		self.dbfile = "lnmpp.dat"
+
+	def update(self):
+		print "fetching data from %s" % self.res 
+		try:
+			http_content = urllib2.build_opener(urllib2.HTTPHandler).open(self.res).read()
+		except urllib2.URLError,e:
+			print "oops we encounter some error: %s" % (e.reason)
+			sys.exit()
+		lister = URLLister()
+		lister.feed(http_content)
+		print "store data to %s" % self.dbfile
+		f = file(self.dbfile, 'w')  
+		obj_pickle.dump(lister, f) # dump the object to a file  
+		f.close()  
+		print "udate finished"
+
+	def get_list(self):
+		f =  file(self.dbfile) 
+		lister = obj_pickle.load(f)
+		f.close()
+		return lister.eggs 
+
+	def get_version(self):
+		f =  file(self.dbfile) 
+		lister = obj_pickle.load(f)
+		f.close() 
+		return lister.version
+
+	def search(self,pkg_name):
+		eggs = self.get_list()
+		if not pkg_name in eggs:
+			print "%s not found,please update first or check in %s" % (pkg_name,self.res)
+
+		pkg_url = self.res+'/'+pkg_name
+		print "read from %s" % pkg_url
+		try:
+			http_content = urllib2.build_opener(urllib2.HTTPHandler).open(pkg_url).read()
+		except urllib2.URLError,e:
+			print "oops we encounter some error: %s" % (e.reason)
+			sys.exit()
+
+	
+		lister = URLLister()
+		lister.feed(http_content)
+		
+		return lister.eggs
+
+
+class URLLister(SGMLParser):
+	def __init__(self):
+		SGMLParser.__init__(self)
+		self.timestamp = time.time()
+		self.is_h2 = ""
+		self.is_a = ""
+		self.href = ""
+		self.version = []
+		self.eggs = []
+
+	def start_h2(self, attrs):
+		self.is_h2 = 1
+
+	def end_h2(self):
+		self.is_h2 = ""
+
+
+	def handle_data(self, text):
+		if self.is_h2 == 1:
+			self.version.append(text)
+		if self.is_a == 1:
+			if self.href == text:
+				text = text.rstrip('/')
+				self.eggs.append(text)	
+
+	def start_a(self, attrs):		                 
+		#href = [v for k, v in attrs if k=='href'] 
+		for k,v in attrs:
+			if k=='href':
+				self.href = v
+				self.is_a = 1
+	
+			
+
+if __name__ == "__main__":
+	main()	
