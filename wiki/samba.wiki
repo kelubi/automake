@@ -1,0 +1,35 @@
+#summary One-sentence summary of this page.
+
+{{{
+cat >/etc/samba/smb.conf<<'EOF'
+[global]
+    workgroup = WORKGROUP
+    netbios name = lemote box
+    server string = file share server run on lemote minibox
+
+    dos charset = gb2312
+    unix charset = gb2312
+    display charset = gb2312
+
+    security = share
+    guest account = apache
+
+    socket options = TCP_NODELAY SO_RCVBUF=8192 SO_SNDBUF=8192
+    dns proxy = no
+    template shell = /bin/false
+    winbind use default domain = no
+
+    load printers = no
+    printing = bsd
+    printcap name = /dev/null
+    show add printer wizard = no
+    disable spoolss = yes
+
+[htdocs]
+    comment = Http Documents Directories
+    browseable = yes
+    writable = yes
+    public = yes
+    path = /var/www/html
+EOF
+}}}

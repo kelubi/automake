@@ -1,0 +1,928 @@
+命令序列
+
+= Introduction =
+
+这是一堆命令序列，ctrl+c && ctrl +v 大发，适用无聊的人编译者玩。
+
+所谓的自动化脚本只是消灭掉这些无聊的工作
+
+
+= Details =
+
+前期准备工作
+{{{
+
+cd /etc/yum.repos.d/
+rm  -f *
+wget http://lnmpp.googlecode.com/files/163.repo
+yum -y remove mysql mysql-server php httpd
+yum -y install gcc gcc-c++ autoconf libjpeg libjpeg-devel libpng libpng-devel freetype freetype-devel libxml2 libxml2-devel zlib zlib-devel glibc glibc-devel glib2 glib2-devel bzip2 bzip2-devel ncurses ncurses-devel curl curl-devel e2fsprogs e2fsprogs-devel krb5 krb5-devel libidn libidn-devel openssl openssl-devel openldap openldap-devel nss_ldap openldap-clients openldap-servers
+
+}}}
+
+安装次序是
+ # nginx
+ # mysql
+ # php
+
+{{{
+wget http://lnmpp.googlecode.com/files/pcre-8.01.tar.gz
+tar xf pcre-8.01.tar.gz    
+cd pcre-8.01
+./configure       
+make install
+cd ..
+#
+wget http://lnmpp.googlecode.com/files/nginx-0.8.41.tar.gz
+tar xf nginx-0.8.41.tar.gz       
+cd nginx-0.8.41
+./configure --user=apache --group=apache --prefix=/srv/nginx --with-http_stub_status_module --with-http_ssl_module --with-openssl=/usr/local --with-http_gzip_static_module
+make
+make install
+cd ..
+#
+tar xf mysql-5.5.2-m2.tar.gz 
+cd mysql-5.5.2-m2
+./configure --prefix=/srv/mysql --enable-assembler --with-extra-charsets=complex --enable-thread-safe-client --with-big-tables --with-readline --with-ssl --with-embedded-server --enable-local-infile --with-plugins=partition,innobase,myisammrg
+cd ..
+#
+tar zxvf libmcrypt-2.5.8.tar.gz 
+cd libmcrypt-2.5.8/
+./configure
+make
+make install
+/sbin/ldconfig
+cd libltdl/
+./configure --enable-ltdl-install
+make
+make install
+cd ../../
+ln -s /usr/local/lib/libmcrypt.la /usr/lib/libmcrypt.la
+ln -s /usr/local/lib/libmcrypt.so /usr/lib/libmcrypt.so
+ln -s /usr/local/lib/libmcrypt.so.4 /usr/lib/libmcrypt.so.4
+ln -s /usr/local/lib/libmcrypt.so.4.4.8 /usr/lib/libmcrypt.so.4.4.8
+#
+tar zxvf mhash-0.9.9.9.tar.gz 
+cd mhash-0.9.9.9
+./configure 
+make
+make install
+ln -s /usr/local/lib/libmhash.a /usr/lib/libmhash.a
+ln -s /usr/local/lib/libmhash.la /usr/lib/libmhash.la
+ln -s /usr/local/lib/libmhash.so /usr/lib/libmhash.so
+ln -s /usr/local/lib/libmhash.so.2 /usr/lib/libmhash.so.2
+ln -s /usr/local/lib/libmhash.so.2.0.1 /usr/lib/libmhash.so.2.0.1
+cd ..
+#
+tar zxvf mcrypt-2.6.8.tar.gz
+cd mcrypt-2.6.8/
+/sbin/ldconfig
+./configure
+make
+make install
+cd ../
+#
+tar xf php-5.2.13.tar.gz
+gzip -cd php-5.2.13-fpm-0.5.13.diff.gz | patch -d php-5.2.13 -p1
+cd php-5.2.13
+./configure --prefix=/srv/php --with-config-file-path=/srv/php/etc --with-mysql=/srv/mysql --with-iconv-dir=/usr/local --with-freetype-dir --with-jpeg-dir --with-png-dir --with-zlib --with-libxml-dir=/usr --enable-xml --disable-rpath --enable-discard-path  --enable-bcmath --enable-shmop --enable-sysvsem --enable-inline-optimization --with-curl --with-curlwrappers --enable-mbregex --enable-fastcgi --enable-fpm --enable-force-cgi-redirect --enable-mbstring --with-mcrypt --with-gd --enable-gd-native-ttf --with-openssl --with-mhash  --enable-sockets  --with-xmlrpc --enable-zip --enable-soap
+make
+make install
+}}}
+
+===MySQL配置===
+初始化
+{{{
+useradd  -s /sbin/nologin mysql
+mkdir -pv /opt/mysqldb
+/srv/mysql/bin/mysql_install_db --datadir=/opt/mysqldb
+chown mysql:mysql /opt/mysqldb/ -R
+}}}
+
+配置文件
+{{{
+cat >/etc/my.cnf<<'EOF'
+[client]
+port            = 3306
+socket          = /tmp/mysql.sock
+[mysqld]
+port            = 3306
+socket          = /tmp/mysql.sock
+skip-locking
+key_buffer_size = 384M
+max_allowed_packet = 1M
+table_open_cache = 512
+sort_buffer_size = 2M
+read_buffer_size = 2M
+read_rnd_buffer_size = 8M
+myisam_sort_buffer_size = 64M
+thread_cache_size = 8
+query_cache_size = 32M
+thread_concurrency = 8
+log-bin=mysql-bin
+server-id       = 1
+[mysqldump]
+quick
+max_allowed_packet = 16M
+[mysql]
+no-auto-rehash
+[myisamchk]
+key_buffer_size = 256M
+sort_buffer_size = 256M
+read_buffer = 2M
+write_buffer = 2M
+[mysqlhotcopy]
+interactive-timeout
+EOF
+}}}
+
+启动脚本
+{{{
+# chkconfig:    345 99 03
+#
+# description:  This is a daemon which as you known
+
+cat > /etc/rc.d/init.d/mysqld<<'EOF'
+basedir=/srv/mysql
+datadir=/opt/mysqldb
+service_startup_timeout=900
+lockdir='/var/lock/subsys'
+lock_file_path="$lockdir/mysql"
+mysqld_pid_file_path=
+if test -z "$basedir"
+then
+  basedir=/srv/mysql
+  bindir=/srv/mysql/bin
+  if test -z "$datadir"
+  then
+    datadir=/srv/mysql/var
+  fi
+  sbindir=/srv/mysql/sbin
+  libexecdir=/srv/mysql/libexec
+else
+  bindir="$basedir/bin"
+  if test -z "$datadir"
+  then
+    datadir="$basedir/data"
+  fi
+  sbindir="$basedir/sbin"
+  libexecdir="$basedir/libexec"
+fi
+datadir_set=
+lsb_functions="/lib/lsb/init-functions"
+if test -f $lsb_functions ; then
+  . $lsb_functions
+else
+  log_success_msg()
+  {
+    echo " SUCCESS! $@"
+  }
+  log_failure_msg()
+  {
+    echo " ERROR! $@"
+  }
+fi
+PATH="/sbin:/usr/sbin:/bin:/usr/bin:$basedir/bin"
+export PATH
+mode=$1    # start or stop
+[ $# -ge 1 ] && shift
+other_args="$*"   # uncommon, but needed when called from an RPM upgrade action
+           # Expected: "--skip-networking --skip-grant-tables"
+           # They are not checked here, intentionally, as it is the resposibility
+           # of the "spec" file author to give correct arguments only.
+case `echo "testing\c"`,`echo -n testing` in
+    *c*,-n*) echo_n=   echo_c=     ;;
+    *c*,*)   echo_n=-n echo_c=     ;;
+    *)       echo_n=   echo_c='\c' ;;
+esac
+parse_server_arguments() {
+  for arg do
+    case "$arg" in
+      --basedir=*)  basedir=`echo "$arg" | sed -e 's/^[^=]*=//'`
+                    bindir="$basedir/bin"
+                    if test -z "$datadir_set"; then
+                      datadir="$basedir/data"
+                    fi
+                    sbindir="$basedir/sbin"
+                    libexecdir="$basedir/libexec"
+        ;;
+      --datadir=*)  datadir=`echo "$arg" | sed -e 's/^[^=]*=//'`
+                    datadir_set=1
+        ;;
+      --pid-file=*) mysqld_pid_file_path=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
+      --service-startup-timeout=*) service_startup_timeout=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
+    esac
+  done
+}
+wait_for_pid () {
+  verb="$1"           # created | removed
+  pid="$2"            # process ID of the program operating on the pid-file
+  pid_file_path="$3" # path to the PID file.
+  i=0
+  avoid_race_condition="by checking again"
+  while test $i -ne $service_startup_timeout ; do
+    case "$verb" in
+      'created')
+        # wait for a PID-file to pop into existence.
+        test -s "$pid_file_path" && i='' && break
+        ;;
+      'removed')
+        # wait for this PID-file to disappear
+        test ! -s "$pid_file_path" && i='' && break
+        ;;
+      *)
+        echo "wait_for_pid () usage: wait_for_pid created|removed pid pid_file_path"
+        exit 1
+        ;;
+    esac
+    # if server isn't running, then pid-file will never be updated
+    if test -n "$pid"; then
+      if kill -0 "$pid" 2>/dev/null; then
+        :  # the server still runs
+      else
+        # The server may have exited between the last pid-file check and now.  
+        if test -n "$avoid_race_condition"; then
+          avoid_race_condition=""
+          continue  # Check again.
+        fi
+        # there's nothing that will affect the file.
+        log_failure_msg "The server quit without updating PID file ($pid_file_path)."
+        return 1  # not waiting any more.
+      fi
+    fi
+    echo $echo_n ".$echo_c"
+    i=`expr $i + 1`
+    sleep 1
+  done
+  if test -z "$i" ; then
+    log_success_msg
+    return 0
+  else
+    log_failure_msg
+    return 1
+  fi
+}
+if test -x ./bin/my_print_defaults
+then
+  print_defaults="./bin/my_print_defaults"
+elif test -x $bindir/my_print_defaults
+then
+  print_defaults="$bindir/my_print_defaults"
+elif test -x $bindir/mysql_print_defaults
+then
+  print_defaults="$bindir/mysql_print_defaults"
+else
+  # Try to find basedir in /etc/my.cnf
+  conf=/etc/my.cnf
+  print_defaults=
+  if test -r $conf
+  then
+    subpat='^[^=]*basedir[^=]*=\(.*\)$'
+    dirs=`sed -e "/$subpat/!d" -e 's//\1/' $conf`
+    for d in $dirs
+    do
+      d=`echo $d | sed -e 's/[  ]//g'`
+      if test -x "$d/bin/my_print_defaults"
+      then
+        print_defaults="$d/bin/my_print_defaults"
+        break
+      fi
+      if test -x "$d/bin/mysql_print_defaults"
+      then
+        print_defaults="$d/bin/mysql_print_defaults"
+        break
+      fi
+    done
+  fi
+  # Hope it's in the PATH ... but I doubt it
+  test -z "$print_defaults" && print_defaults="my_print_defaults"
+fi
+extra_args=""
+if test -r "$basedir/my.cnf"
+then
+  extra_args="-e $basedir/my.cnf"
+else
+  if test -r "$datadir/my.cnf"
+  then
+    extra_args="-e $datadir/my.cnf"
+  fi
+fi
+parse_server_arguments `$print_defaults $extra_args mysqld server mysql_server mysql.server`
+if test -z "$mysqld_pid_file_path"
+then
+  mysqld_pid_file_path=$datadir/`/bin/hostname`.pid
+else
+  case "$mysqld_pid_file_path" in
+    /* ) ;;
+    * )  mysqld_pid_file_path="$datadir/$mysqld_pid_file_path" ;;
+  esac
+fi
+case "$mode" in
+  'start')
+    # Start daemon
+    # Safeguard (relative paths, core dumps..)
+    cd $basedir
+    echo $echo_n "Starting MySQL"
+    if test -x $bindir/mysqld_safe
+    then
+      # Give extra arguments to mysqld with the my.cnf file. This script
+      # may be overwritten at next upgrade.
+      $bindir/mysqld_safe --datadir="$datadir" --pid-file="$mysqld_pid_file_path" $other_args >/dev/null 2>&1 &
+      wait_for_pid created "$!" "$mysqld_pid_file_path"; return_value=$?
+      # Make lock for RedHat / SuSE
+      if test -w "$lockdir"
+      then
+        touch "$lock_file_path"
+      fi
+      exit $return_value
+    else
+      log_failure_msg "Couldn't find MySQL server ($bindir/mysqld_safe)"
+    fi
+    ;;
+  'stop')
+    # Stop daemon. We use a signal here to avoid having to know the
+    # root password.
+    if test -s "$mysqld_pid_file_path"
+    then
+      mysqld_pid=`cat "$mysqld_pid_file_path"`
+      if (kill -0 $mysqld_pid 2>/dev/null)
+      then
+        echo $echo_n "Shutting down MySQL"
+        kill $mysqld_pid
+        # mysqld should remove the pid file when it exits, so wait for it.
+        wait_for_pid removed "$mysqld_pid" "$mysqld_pid_file_path"; return_value=$?
+      else
+        log_failure_msg "MySQL server process #$mysqld_pid is not running!"
+        rm "$mysqld_pid_file_path"
+      fi
+      # Delete lock for RedHat / SuSE
+      if test -f "$lock_file_path"
+      then
+        rm -f "$lock_file_path"
+      fi
+      exit $return_value
+    else
+      log_failure_msg "MySQL server PID file could not be found!"
+    fi
+    ;;
+  'restart')
+    # Stop the service and regardless of whether it was
+    # running or not, start it again.
+    if $0 stop  $other_args; then
+      $0 start $other_args
+    else
+      log_failure_msg "Failed to stop running server, so refusing to try to start."
+      exit 1
+    fi
+    ;;
+  'reload'|'force-reload')
+    if test -s "$mysqld_pid_file_path" ; then
+      read mysqld_pid <  "$mysqld_pid_file_path"
+      kill -HUP $mysqld_pid && log_success_msg "Reloading service MySQL"
+      touch "$mysqld_pid_file_path"
+    else
+      log_failure_msg "MySQL PID file could not be found!"
+      exit 1
+    fi
+    ;;
+  'status')
+    # First, check to see if pid file exists
+    if test -s "$mysqld_pid_file_path" ; then 
+      read mysqld_pid < "$mysqld_pid_file_path"
+      if kill -0 $mysqld_pid 2>/dev/null ; then 
+        log_success_msg "MySQL running ($mysqld_pid)"
+        exit 0
+      else
+        log_failure_msg "MySQL is not running, but PID file exists"
+        exit 1
+      fi
+    else
+      # Try to find appropriate mysqld process
+      mysqld_pid=`pidof $libexecdir/mysqld`
+      if test -z $mysqld_pid ; then 
+        if test -f "$lock_file_path" ; then 
+          log_failure_msg "MySQL is not running, but lock file ($lock_file_path) exists"
+          exit 2
+        fi 
+        log_failure_msg "MySQL is not running"
+        exit 3
+      else
+        log_failure_msg "MySQL is running but PID file could not be found"
+        exit 4
+      fi
+    fi
+    ;;
+    *)
+      # usage
+      basename=`basename "$0"`
+      echo "Usage: $basename  {start|stop|restart|reload|force-reload|status}  [ MySQL server options ]"
+      exit 1
+    ;;
+esac
+exit 0
+EOF
+}}}
+
+设置随机启动
+
+{{{
+chkconfig mysql --level 3 on
+service mysqld start
+}}}
+
+===nginx配置===
+
+主配置文件
+
+{{{
+cat >/srv/nginx/conf/nginx.conf<<'EOF'
+user  apache apache;
+worker_processes 4;
+error_log  /var/log/nginx_error.log  crit;
+worker_rlimit_nofile 65535;
+events
+{
+  use epoll;
+  worker_connections 65535;
+}
+
+http
+{
+  include       mime.types;
+  default_type  application/octet-stream;
+
+  server_names_hash_bucket_size 128;
+  client_header_buffer_size 32k;
+  large_client_header_buffers 4 32k;
+  client_max_body_size 8m;
+
+  sendfile on;
+  tcp_nopush     on;
+  keepalive_timeout 60;
+  tcp_nodelay on;
+
+  fastcgi_connect_timeout 300;
+  fastcgi_send_timeout 300;
+  fastcgi_read_timeout 300;
+  fastcgi_buffer_size 64k;
+  fastcgi_buffers 4 64k;
+  fastcgi_busy_buffers_size 128k;
+  fastcgi_temp_file_write_size 128k;
+
+  gzip    on;
+  gzip_min_length   1k;
+  gzip_buffers   4 8k;
+  gzip_http_version  1.1;
+  gzip_types   text/plain application/x-javascript text/css  application/xml;
+  gzip_disable "MSIE [1-6]\.";
+
+  log_format  access  '$remote_addr - $remote_user [$time_local] "$request" '
+             '$status $body_bytes_sent "$http_referer" '
+             '"$http_user_agent" $http_x_forwarded_for';
+
+  include site/*.conf;
+}
+EOF
+}}}
+
+php fast cgi配置文件
+
+{{{
+cat >/srv/nginx/conf/php_fcgi.conf<<'EOF'
+fastcgi_pass  127.0.0.1:9000;
+
+fastcgi_param  GATEWAY_INTERFACE  CGI/1.1;
+fastcgi_param  SERVER_SOFTWARE    nginx;
+
+fastcgi_param  QUERY_STRING       $query_string;
+fastcgi_param  REQUEST_METHOD     $request_method;
+fastcgi_param  CONTENT_TYPE       $content_type;
+fastcgi_param  CONTENT_LENGTH     $content_length;
+
+fastcgi_param  SCRIPT_FILENAME    $document_root$fastcgi_script_name;
+fastcgi_param  SCRIPT_NAME        $fastcgi_script_name;
+fastcgi_param  REQUEST_URI        $request_uri;
+fastcgi_param  DOCUMENT_URI       $document_uri;
+fastcgi_param  DOCUMENT_ROOT      $document_root;
+fastcgi_param  SERVER_PROTOCOL    $server_protocol;
+
+fastcgi_param  REMOTE_ADDR        $remote_addr;
+fastcgi_param  REMOTE_PORT        $remote_port;
+fastcgi_param  SERVER_ADDR        $server_addr;
+fastcgi_param  SERVER_PORT        $server_port;
+fastcgi_param  SERVER_NAME        $server_name;
+
+# PHP only, required if PHP was built with --enable-force-cgi-redirect
+fastcgi_param  REDIRECT_STATUS    200;
+EOF
+}}}
+
+{{{
+mkdir -v /srv/nginx/conf/site
+}}}
+
+站点配置文件样本
+
+{{{
+cat > /srv/nginx/conf/site/default.conf<<'EOF'
+server
+{
+    listen       80;
+    server_name  default;
+    index index.html index.htm index.php;
+    root  /var/www/html;
+     
+    location ~ .*\.php?$
+    {
+      include php_fcgi.conf;
+    }
+
+    location ~ .*\.(gif|jpg|jpeg|png|bmp|swf)$
+    {
+      expires      30d;
+    }
+
+    location ~ .*\.(js|css)?$
+    {
+      expires      1h;
+    }
+
+   #access_log  /var/log/bdhrice  access;
+    access_log off;
+    location /nginx_status {
+        stub_status on;
+        access_log   off;
+        #allow SOME.IP.ADD.RESS;
+        #deny all;
+   }
+}
+EOF
+}}}
+
+===php配置===
+
+
+{{{
+cat >/srv/php/etc/php.ini<<'EOF'
+[PHP]
+engine = On
+zend.ze1_compatibility_mode = Off
+short_open_tag = On
+asp_tags = Off
+precision    =  12
+y2k_compliance = On
+output_buffering = Off
+zlib.output_compression = Off
+implicit_flush = Off
+unserialize_callback_func=
+serialize_precision = 100
+allow_call_time_pass_reference = On
+safe_mode = Off
+safe_mode_gid = Off
+safe_mode_include_dir =
+safe_mode_exec_dir =
+safe_mode_allowed_env_vars = PHP_
+safe_mode_protected_env_vars = LD_LIBRARY_PATH
+disable_functions =
+disable_classes =
+expose_php = On
+max_execution_time = 30     ; Maximum execution time of each script, in seconds
+max_input_time = 60     ; Maximum amount of time each script may spend parsing request data
+memory_limit = 128M      ; Maximum amount of memory a script may consume (128MB)
+error_reporting = E_ALL & ~E_NOTICE
+display_errors = On
+display_startup_errors = Off
+log_errors = Off
+log_errors_max_len = 1024
+ignore_repeated_errors = Off
+ignore_repeated_source = Off
+report_memleaks = On
+track_errors = Off
+variables_order = "EGPCS"
+register_globals = Off
+register_long_arrays = On
+register_argc_argv = On
+auto_globals_jit = On
+post_max_size = 8M
+magic_quotes_gpc = On
+magic_quotes_runtime = Off
+magic_quotes_sybase = Off
+auto_prepend_file =
+auto_append_file =
+default_mimetype = "text/html"
+doc_root =
+user_dir =
+extension_dir = "./"
+enable_dl = On
+file_uploads = On
+upload_max_filesize = 2M
+max_file_uploads = 20
+allow_url_fopen = On
+allow_url_include = Off
+default_socket_timeout = 60
+[Date]
+[filter]
+[iconv]
+[sqlite]
+[Pcre]
+[Syslog]
+define_syslog_variables  = Off
+[mail function]
+SMTP = localhost
+smtp_port = 25
+[SQL]
+sql.safe_mode = Off
+[ODBC]
+odbc.allow_persistent = On
+odbc.check_persistent = On
+odbc.max_persistent = -1
+odbc.max_links = -1
+odbc.defaultlrl = 4096
+odbc.defaultbinmode = 1
+[MySQL]
+mysql.allow_persistent = On
+mysql.max_persistent = -1
+mysql.max_links = -1
+mysql.default_port =
+mysql.default_socket =
+mysql.default_host =
+mysql.default_user =
+mysql.default_password =
+mysql.connect_timeout = 60
+mysql.trace_mode = Off
+[MySQLi]
+mysqli.max_links = -1
+mysqli.default_port = 3306
+mysqli.default_socket =
+mysqli.default_host =
+mysqli.default_user =
+mysqli.default_pw =
+mysqli.reconnect = Off
+[mSQL]
+msql.allow_persistent = On
+msql.max_persistent = -1
+msql.max_links = -1
+[OCI8]
+[PostgresSQL]
+pgsql.allow_persistent = On
+pgsql.auto_reset_persistent = Off
+pgsql.max_persistent = -1
+pgsql.max_links = -1
+pgsql.ignore_notice = 0
+pgsql.log_notice = 0
+[Sybase]
+sybase.allow_persistent = On
+sybase.max_persistent = -1
+sybase.max_links = -1
+sybase.min_error_severity = 10
+sybase.min_message_severity = 10
+sybase.compatability_mode = Off
+[Sybase-CT]
+sybct.allow_persistent = On
+sybct.max_persistent = -1
+sybct.max_links = -1
+sybct.min_server_severity = 10
+sybct.min_client_severity = 10
+[bcmath]
+bcmath.scale = 0
+[browscap]
+[Informix]
+ifx.default_host =
+ifx.default_user =
+ifx.default_password =
+ifx.allow_persistent = On
+ifx.max_persistent = -1
+ifx.max_links = -1
+ifx.textasvarchar = 0
+ifx.byteasvarchar = 0
+ifx.charasvarchar = 0
+ifx.blobinfile = 0
+ifx.nullformat = 0
+[Session]
+session.save_path = /tmp
+session.save_handler = files
+session.use_cookies = 1
+session.name = PHPSESSID
+session.auto_start = 0
+session.cookie_lifetime = 0
+session.cookie_path = /
+session.cookie_domain =
+session.cookie_httponly = 
+session.serialize_handler = php
+session.gc_probability = 1
+session.gc_divisor     = 100
+session.gc_maxlifetime = 1440
+session.bug_compat_42 = 1
+session.bug_compat_warn = 1
+session.referer_check =
+session.entropy_length = 0
+session.entropy_file =
+session.cache_limiter = nocache
+session.cache_expire = 180
+session.use_trans_sid = 0
+session.hash_function = 0
+session.hash_bits_per_character = 4
+url_rewriter.tags = "a=href,area=href,frame=src,input=src,form=,fieldset="
+[MSSQL]
+mssql.allow_persistent = On
+mssql.max_persistent = -1
+mssql.max_links = -1
+mssql.min_error_severity = 10
+mssql.min_message_severity = 10
+mssql.compatability_mode = Off
+mssql.secure_connection = Off
+[Assertion]
+[COM]
+[mbstring]
+[FrontBase]
+[gd]
+[exif]
+[Tidy]
+tidy.clean_output = Off
+[soap]
+soap.wsdl_cache_enabled=1
+soap.wsdl_cache_dir="/tmp"
+soap.wsdl_cache_ttl=86400
+EOF
+}}}
+
+===net-snmp===
+
+{{{
+cat >/etc/snmp/snmpd.conf<<'EOF'
+com2sec notConfigUser default passwordforgetinfo
+ 
+group notConfigGroup v1 notConfigUser
+group notConfigGroup v2c notConfigUser
+ 
+view systemview included .1.3.6.1.2.1.1
+view systemview included .1.3.6.1.2.1.25.1.1
+ 
+access notConfigGroup "" any noauth exact all none none
+ 
+view all included .1 80
+view mib2 included .iso.org.dod.internet.mgmt.mib-2 fc
+view all included .1
+EOF
+}}}
+
+防火墙规则
+{{{
+-A RH-Firewall-1-INPUT -m state --state NEW -m udp -p udp --dport 161 -j ACCEPT
+}}}
+
+
+===proftpd===
+
+用mysql保持用户。
+
+mysql脚本
+{{{
+CREATE DATABASE `ftpd` ;
+USE `ftpd`;
+
+CREATE TABLE IF NOT EXISTS `ftpgroups` (
+  `groupname` varchar(30) NOT NULL,
+  `gid` int(11) NOT NULL DEFAULT '1000',
+  `members` varchar(255) NOT NULL
+) ENGINE=MyISAM ;
+
+
+CREATE TABLE IF NOT EXISTS `ftpusers` (
+  `userid` varchar(30) NOT NULL,
+  `passwd` varchar(80) NOT NULL,
+  `uid` int(10) unsigned NOT NULL DEFAULT '48',
+  `gid` int(10) unsigned NOT NULL DEFAULT '48',
+  `homedir` varchar(255) NOT NULL,
+  `shell` varchar(255) NOT NULL DEFAULT '/sbin/nologin',
+  `count` int(10) unsigned NOT NULL DEFAULT '0',
+  `host` varchar(30) NOT NULL,
+  `lastlogin` varchar(30) NOT NULL,
+  UNIQUE KEY `userid` (`userid`)
+) ENGINE=MyISAM;
+
+
+CREATE TABLE IF NOT EXISTS `quotalimits` (
+  `name` varchar(30) DEFAULT NULL,
+  `quota_type` enum('user','group','class','all') NOT NULL DEFAULT 'user',
+  `per_session` enum('false','true') NOT NULL DEFAULT 'false',
+  `limit_type` enum('soft','hard') NOT NULL DEFAULT 'soft',
+  `bytes_in_avail` float NOT NULL DEFAULT '0',
+  `bytes_out_avail` float NOT NULL DEFAULT '0',
+  `bytes_xfer_avail` float NOT NULL DEFAULT '0',
+  `files_in_avail` int(10) unsigned NOT NULL DEFAULT '0',
+  `files_out_avail` int(10) unsigned NOT NULL DEFAULT '0',
+  `files_xfer_avail` int(10) unsigned NOT NULL DEFAULT '0'
+) ENGINE=MyISAM;
+
+
+CREATE TABLE IF NOT EXISTS `quotatallies` (
+  `name` varchar(30) NOT NULL,
+  `quota_type` enum('user','group','class','all') NOT NULL DEFAULT 'user',
+  `bytes_in_used` float NOT NULL DEFAULT '0',
+  `bytes_out_used` float NOT NULL DEFAULT '0',
+  `bytes_xfer_used` float NOT NULL DEFAULT '0',
+  `files_in_used` int(10) unsigned NOT NULL DEFAULT '0',
+  `files_out_used` int(10) unsigned NOT NULL DEFAULT '0',
+  `files_xfer_used` int(10) unsigned NOT NULL DEFAULT '0'
+) ENGINE=MyISAM;
+
+}}}
+
+配置文件
+
+{{{
+cat >/srv/proftpd/etc/proftpd.conf<<'EOF'
+#Basic setting
+ServerName    "FTP Server"
+ServerType    standalone
+ServerAdmin    root@localhost
+DefaultServer   On
+ServerIdent    Off
+DisplayLogin   /srv/proftpd/etc/ftplogin.msg
+Port     21
+Umask     022
+MaxLoginAttempts  5
+TimeoutStalled   600
+TimeoutLogin   900
+TimeoutIdle    600
+TimeoutNoTransfer  600
+User     apache
+Group     apache
+DefaultRoot    ~
+RequireValidShell  off
+UseReverseDNS   off
+IdentLookups   off
+AllowStoreRestart  on
+AllowRetrieveRestart on
+MaxInstances   30
+#Access control
+<Limit LOGIN>
+ AllowAll
+</Limit>
+<Directory />
+  AllowOverwrite on
+</Directory>
+#MySQL connection setting
+SQLConnectInfo  proftpd@127.0.0.1  proftpd lovenosogood008
+SQLAuthTypes   Plaintext
+SQLUserInfo    ftpusers userid passwd uid gid homedir shell
+SQLGroupInfo   ftpgroups groupname gid members
+SQLAuthenticate   users groups
+SQLNegativeCache  on
+#SQLHomedirOnDemand  on
+SQLDefaultGID   48
+SQLDefaultUID   48
+SQLNamedQuery getcount SELECT "count from ftpusers where userid='%u'"
+SQLNamedQuery getlastlogin SELECT "lastlogin from ftpusers where userid='%u'"
+SQLNamedQuery updatelogininfo UPDATE "count=count+1,host='%h',lastlogin=current_timestamp() WHERE userid='%u'" ftpusers
+SQLShowInfo PASS "230" "You've logged on %{getcount} times,last login at %{getlastlogin}"
+SQLLog PASS updatelogininfo
+#Disk quota seeting
+QuotaDirectoryTally  on
+QuotaDisplayUnits  "Mb"
+QuotaEngine    on
+QuotaShowQuotas   on
+SQLNamedQuery get-quota-limit SELECT "name,quota_type,per_session,limit_type,bytes_in_avail,bytes_out_avail,bytes_xfer_avail,files_in_avail,files_out_avail,files_xfer_avail FROM quotalimits WHERE name = '%{0}' AND quota_type='%{1}'"
+SQLNamedQuery get-quota-tally SELECT "name,quota_type,bytes_in_used,bytes_out_used,bytes_xfer_used,files_in_used,files_out_used,files_xfer_used FROM quotatallies WHERE name = '%{0}' AND quota_type = '%{1}'"
+SQLNamedQuery update-quota-tally UPDATE "bytes_in_used = bytes_in_used + %{0},bytes_out_used = bytes_out_used + %{1},bytes_xfer_used = bytes_xfer_used + %{2},files_in_used = files_in_used + %{3},files_out_used = files_out_used + %{4},files_xfer_used = files_xfer_used + %{5} WHERE name = '%{6}' AND quota_type = '%{7}'" quotatallies
+SQLNamedQuery insert-quota-tally INSERT "%{0},%{1},%{2},%{3},%{4},%{5},%{6},%{7}" quotatallies
+QuotaLimitTable sql:/get-quota-limit
+QuotaTallyTable sql:/get-quota-tally/update-quota-tally/insert-quota-tally
+EOF
+}}}
+
+启动脚本，在源码目录
+{{{
+cp contrib/dist/rpm/proftpd.init.d /etc/rc.d/init.d/proftpd
+chmod +x /etc/rc.d/init.d/proftpd 
+sed  -i s,/usr/local/sbin,/srv/proftpd/sbin,g /etc/rc.d/init.d/proftpd 
+chkconfig proftpd --level 3 on
+service proftpd start
+modprobe ip_conntrack_ftp  
+}}}
+
+加载一个模块，让连接更畅快些。
+{{{
+cat >>/etc/rc.d/rc.local<<EOF
+/sbin/modprobe ip_conntrack_ftp  
+EOF
+}}}
+
+===配置自启动===
+
+{{{
+cat >>/etc/rc.d/rc.local<<'EOF'
+/srv/nginx/sbin/nginx
+/srv/php/sbin/php-fpm start
+EOF
+chkconfig mysqld --level 3 on
+}}}
+
+
+===方便使用===
+{{{
+ln -sv /srv/mysql/bin/mysql /bin
+ln -sv /srv/php/bin/php /bin
+ln -sv srv/php/bin/php-config /bin
+}}}

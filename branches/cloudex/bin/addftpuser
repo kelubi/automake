@@ -1,0 +1,19 @@
+#!/bin/bash
+
+PASSWORD_FILE=/opt/install/password.txt
+USER=$1
+PASSWORD=$(</dev/urandom tr -dc A-Za-z0-9 | head -c8)
+HOMEDIR=$2
+if [ -z $HOMEDIR ]; then
+    echo "usrage: addftpuser username homedir"
+    exit
+fi 
+PROFTPD_USER=$(grep SQLConnectInfo /usr/local/proftpd/etc/proftpd.conf  | awk '{print $3}')
+PROFTPD_PASS=$(grep SQLConnectInfo /usr/local/proftpd/etc/proftpd.conf  | awk '{print $4}')
+
+echo "use proftpd;INSERT INTO ftpusers (userid,passwd,homedir) values('"$USER"','"$PASSWORD"','"$HOMEDIR"');" | /usr/local/mysql/bin/mysql -u$PROFTPD_USER -p$PROFTPD_PASS -h127.0.0.1
+
+if [ $? -eq 0 ]; then
+ echo "add user "$USER" success,password is: "$PASSWORD
+ echo "proftpd:"$USER":"$PASSWORD >> $PASSWORD_FILE
+fi

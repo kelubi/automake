@@ -1,0 +1,21 @@
+#!/bin/bash
+
+#ME="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+#MEAT=$(dirname $ME)
+PASSWORD_FILE=/opt/install/password.txt
+
+PASSWORD=$(</dev/urandom tr -dc A-Za-z0-9 | head -c8)
+#HOMEDIR=$2
+if [ -z $1 ]; then
+    echo "usrage: addmysqluser databasename "
+    exit
+fi 
+PROFTPD_USER=$(grep mysql /opt/install/password.txt  | awk -F: '{print $2}')
+PROFTPD_PASS=$(grep mysql /opt/install/password.txt  | awk -F: '{print $3}')
+
+echo "create database $1;" | /usr/local/mysql/bin/mysql -u$PROFTPD_USER -p$PROFTPD_PASS
+echo "grant all privileges on $1.* to '"$1"_f'@'localhost' identified by '"$PASSWORD"';" | /usr/local/mysql/bin/mysql -u$PROFTPD_USER -p$PROFTPD_PASS
+if [ $? -eq 0 ]; then
+ echo "add database "$1" success,DB_user is:"${1}"_f password is: "$PASSWORD""
+ echo "$USER:"${1}"_f:$PASSWORD" >> $PASSWORD_FILE
+fi

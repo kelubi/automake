@@ -1,0 +1,47 @@
+#!/bin/bash
+
+curl  http://lnmpp.googlecode.com/svn/branches/grand/bin/sdc2_init | sh
+
+#uninstall useless package
+rpm -qa|grep  httpd
+rpm -e httpd
+rpm -qa|grep mysql
+rpm -e mysql
+rpm -qa|grep php
+rpm -e php
+
+yum -y remove httpd
+yum -y remove php
+yum -y remove mysql-server mysql
+yum -y remove php-mysql
+
+yum -y install yum-fastestmirror
+yum -y remove httpd
+yum -y update
+
+#install base
+for packages in patch make gcc gcc-c++ gcc-g77 flex bison file libtool libtool-libs autoconf kernel-devel libjpeg libjpeg-devel libpng libpng-devel libpng10 libpng10-devel gd gd-devel freetype freetype-devel libxml2 libxml2-devel zlib zlib-devel glib2 glib2-devel bzip2 bzip2-devel libevent libevent-devel ncurses ncurses-devel curl curl-devel e2fsprogs e2fsprogs-devel krb5 krb5-devel libidn libidn-devel openssl openssl-devel vim-minimal nano fonts-chinese gettext gettext-devel ncurses-devel gmp-devel pspell-devel unzip;
+do yum -y install $packages; done
+#
+cmake
+if [ $? -ne 0 ]; then
+    rpm -ivh "http://lnmpp.googlecode.com/files/cmake-2.6.4-7.el5."$( uname -m)".rpm"               
+fi
+#curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/autossh/autossh-1.4b.sh | sh
+#curl  http://lnmpp.googlecode.com/svn/branches/grand/bin/cls_nfs | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/pcre/pcre-8.01.sh | sh
+#curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/nginx/nginx-0.8.41.sh | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/nginx/nginx-1.0.5.sh | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/mysql/mysql-5.5.14.sh | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/libmcrypt/libmcrypt-2.5.8.sh | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/mhash/mhash-0.9.9.9.sh | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/mcrypt/mcrypt-2.6.8.sh | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/libiconv/libiconv-1.13.sh | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/php/php-5.3.6.sh | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/php_memcache/php_memcache-2.2.6.sh | sh
+#curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/php_svn/php_svn-1.0.1.sh | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/snmp/snmp-5.3.2.sh | sh
+#curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/zabbix_agent/zabbix_agent-1.6.4.sh | sh
+curl  http://lnmpp.googlecode.com/svn/branches/grand/lib/proftpd/proftpd-1.3.3d.sh | sh
+#curl  http://lnmpp.googlecode.com/svn/branches/grand/bin/rsync | sh
+#curl http://lnmpp.googlecode.com/svn/branches/grand/lib/bonnie++/bonnie++-1.96.sh | sh

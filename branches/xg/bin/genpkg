@@ -1,0 +1,60 @@
+#!/bin/bash
+
+ME="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+MEAT=$(dirname $ME)
+HOME_DIR=$(dirname $MEAT)
+VER=0.0.2
+#make packages
+RELEASE=lnmpp-$VER.tar.bz2
+RELEASE_DIR=lnmpp-$VER
+RELEASE_SRC=lnmpp_src-$VER.tar.bz2
+RELEASE_SRC_DIR=lnmpp_src-$VER
+RELEASE_FULL=lnmpp_full-$VER.tar.bz2
+RELEASE_FULL_DIR=lnmpp_full-$VER
+cd /tmp
+if [ -f $RELEASE_FULL ]; then
+    rm -f $RELEASE_FULL
+fi
+if [ -f $RELEASE_SRC ]; then
+    rm -f $RELEASE_SRC
+fi
+if [ -f $RELEASE ]; then
+    rm -f $RELEASE
+fi
+if [ -d $RELEASE_FULL_DIR ]; then
+    rm -rf $RELEASE_FULL_DIR
+fi
+if [ -d $RELEASE_SRC_DIR ]; then
+    rm -rf $RELEASE_SRC_DIR
+fi
+if [ -d $RELEASE_DIR ]; then
+    rm -rf $RELEASE_DIR
+fi
+
+cd $HOME_DIR
+svn export . /tmp/$RELEASE_DIR  
+if [ $? -ne 0 ]; then
+    echo "export source code fail"
+    exit 0
+fi 
+cd /tmp
+tar -cjvf $RELEASE  $RELEASE_DIR
+#create source included tar ball
+mv $RELEASE_DIR $RELEASE_SRC_DIR
+/bin/cp -rfv  $HOME_DIR/sources/*  $RELEASE_SRC_DIR/sources
+tar -cjvf $RELEASE_SRC  $RELEASE_SRC_DIR
+#create full tar ball 
+mv $RELEASE_SRC_DIR $RELEASE_FULL_DIR
+/bin/cp -rfv  $HOME_DIR/packages/*  $RELEASE_FULL_DIR/packages
+tar -cjvf $RELEASE_FULL $RELEASE_FULL_DIR
+#
+cd $HOME_DIR
+mv  -f /tmp/$RELEASE_FULL release/
+mv  -f /tmp/$RELEASE_SRC release/
+mv  -f /tmp/$RELEASE release/
+#
+echo "
+=====
+all done!
+
+"

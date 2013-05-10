@@ -1,0 +1,72 @@
+###############################################################
+# author: ugg
+# mail: ugg.xchj@gmail.com
+# url: http://code.google.com/p/rpmcreate/
+###############################################################
+# 包的名称
+Name: rpm_create_test
+# 包的版本信息
+Version: 1.0.0
+# 释放版本号
+Release: 1
+# 依赖包
+Requires:
+# 创建者
+Packager: ugg
+# 摘要信息
+Summary: by ugg test
+# 版权
+copyright: company
+# 指定包目标环境平台
+Architecture: noarch
+
+PEARPATH=/usr/lib/php/
+HTDOCSPATH=/var/www/htdocs/
+ 
+install:
+	# 创建目录
+	mkdir -p $(PEARPATH)
+	mkdir -p $(HTDOCSPATH)
+	# 拷贝文件
+	cp ../src/html.php $(PEARPATH)
+	cp ../src/libphp.php $(HTDOCSPATH)
+	cp ../conf/*.conf $(PEARPATH)
+
+# 以下shell命令，要以TAB开始每一行
+pre:
+# 每行命令以TAB开始,安装包前执行命令
+#	sudo apachectl restart
+preun:
+# 每行命令以TAB开始,卸载包前执行命令
+#	sudo apachectl restart
+postun:
+# 每行命令以TAB开始,卸载包后前执行命令
+#	sudo apachectl restart
+post:
+# 每行命令以TAB开始,删除目录机上的.svn目录，安装包后执行
+# 注意find命令后面的路径必须为目录机上的全路径，不能用其他变量替换全路径
+#	find /usr/lib/php/pear/tbs/apps/customhtml  -type d -name ".svn"|xargs rm -rf	
+#	find /var/www/htdocs/apps/customhtml  -type d -name ".svn"|xargs rm -rf	
+
+# dev环境下执行的shell命令
+dev:
+	echo "dev"
+	sudo cp /usr/lib/php/conf_dev.conf /usr/lib/php/conf.conf
+
+# tst环境下执行的shell命令
+tst:
+	echo "tst"
+	sudo cp /usr/lib/php/conf_tst.conf /usr/lib/php/conf.conf
+
+# prd环境下执行的shell命令
+prd:
+	echo "prd"
+	sudo cp /usr/lib/php/conf_prd.conf /usr/lib/php/conf.conf
+
+
+# 打包日志，同rpm中的%changelog
+changelog:
+# 每行日志以TAB开始
+	* Wed May 20 2009 changjing.xu  %{Version}
+	- this is test
+

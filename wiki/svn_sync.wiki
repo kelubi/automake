@@ -1,0 +1,105 @@
+
+
+= 简介 =
+
+利用php-svn这个扩展做svn更新
+
+php-svn的扩展的安装方法请看
+
+{{{
+http://lnmpp.googlecode.com/svn/trunk/lib/php_svn/php_svn-1.0.1.sh
+}}}
+
+一键安装
+
+{{{
+curl  http://lnmpp.googlecode.com/svn/trunk/lib/php_svn/php_svn-1.0.1.sh | sh
+}}}
+
+
+
+
+= 细节 =
+
+安装好php-svn这个扩展后，再写一个php脚本就可以做更新了。同步的php脚本样例：
+
+{{{
+<?php
+
+set_time_limit(0);
+define('ROOT_DIR',dirname(__FILE__));
+define('APP_DIR',ROOT_DIR.'/app');
+require(APP_DIR . '/base/kernel.php');
+//autoload
+if(!kernel::register_autoload()){
+    require(APP_DIR . '/base/autoload.php');
+}
+$shell = new base_shell_webproxy;
+
+$externals = array(
+'base'=>'https://app.ec-os.net/svn/base/trunk/',
+'dbeav'=>'https://app.ec-os.net/svn/dbeav/trunk',
+'desktop'=>'https://app.ec-os.net/svn/desktop/trunk',
+'site'=>'https://app.ec-os.net/svn/site/trunk',
+);
+
+svn_auth_set_parameter(SVN_AUTH_PARAM_DEFAULT_USERNAME, 'svn_user_name');
+svn_auth_set_parameter(SVN_AUTH_PARAM_DEFAULT_PASSWORD, 'svn_password');
+
+
+$res = svn_update('/data/httpd/html/deploy.shangchao.ex-sandbox.com');
+echo 'update to version: ' . $res;
+
+echo '<html><head><title>svn update</title>';
+echo '<link src="http://www.shopexued.com/getlog/statics/framework.css" />';
+echo '<style>  th,td{text-align:center;}
+   td{border-bottom:1px #efefef solid;}</style> ';
+echo '</head><body><div class="t2t" id="content">';
+echo '<table>';
+echo '<tr><td>app</td><td>ver</td><td>author</td><td>msg</td><td>date</td><td>files</td></tr>';
+foreach($externals AS $app=>$svnurl){
+        $cat = svn_ls($svnurl);
+        $version = 0;
+        foreach($cat AS $val){
+                $version = ($version > $val['created_rev']) ? $version : $val['created_rev'];
+        }
+
+        if(base_kvstore::instance('chaoshi/svn')->fetch('app_version_' . $app, $k_version)){
+                if($version > $k_version){
+                        $get_log = true;
+                }else{
+                        $get_log = false;
+                }
+        }else{
+                $get_log = true;
+        }
+
+        if($get_log){
+                base_kvstore::instance('chaoshi/svn')->store('app_version_' . $app, $version);
+
+                $info = svn_log($svnurl, $version);
+                //echo '<PRE>';
+                //print_r($info);exit;
+                $path = array();
+                foreach($info[0]['paths'] AS $paths){
+                        $path[] = '[' . $paths['action'] . ']' . $paths['path'];
+                }
+
+                echo sprintf('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>', $app, $info[0]['rev'], $info[0]['author'], $info[0]['msg'], $info[0]['date'], join('<br>', $path));
+        }else{
+                echo sprintf('<tr><td>%s</td><td>%s</td><td colspan="4">%s</td></tr>', $app, $version, 'No need to update');
+        }
+}
+echo '</table>';
+
+$shell->exec_command('update');
+
+echo date('Y-m-d H:i:s') , '</div></body></html>';
+}}}
+
+用法是在浏览器直接访问这个文件就行了。
+
+php-svn扩展的使用说明：
+{{{
+http://php.net/manual/en/book.svn.php
+}}}

@@ -1,0 +1,76 @@
+#方便更新安装文件
+
+= Introduction =
+
+暂时无语，，，
+
+= Details =
+
+需要先下载python写的上传脚本
+
+http://support.googlecode.com/svn/trunk/scripts/googlecode_upload.py
+
+下面是批量上传的bash脚本
+
+{{{
+#!/bin/sh
+ 
+projectname='projectname'
+username='gmail account'
+password='projectpassword'
+#
+ 
+checksize () {
+    filesize=$(ls -l $1 | awk '{print $5}')
+    if [ $filesize -gt 1000000 ] ; then
+        return 1
+    else
+        return 0
+    fi
+}
+ 
+upload () {
+ 
+    local filename=$1
+ 
+    if checksize $filename ; then
+        echo "$filename is large than 100M skip"
+        exit
+    fi
+ 
+    if [ -f $filename  ]
+    then
+        local subject=$filename
+        for postfix in .tar.gz .tar.bz2 .tar .zip .rar .msi
+        do
+            subject=`echo $subject | sed "s/$postfix//" `
+        done
+        #
+        /bin/googlecode_upload.py -s $subject  -p $projectname -u $username -w $password $filename
+    else
+        echo "$filename not exist"
+    fi
+}
+ 
+#########################################################3
+ 
+if [ $# -eq 0 ] ; then
+    echo "usage: $(basename $0) (filename|all)"
+    exit 1
+fi
+ 
+if [ "$1" = "all" ] ; then
+    for iterator in $(ls )
+    do
+        echo "upload $iterator ..."
+        upload $iterator
+    done
+else
+    upload $1
+fi
+ 
+exit 0
+
+}}}
+
+下一个目标，我们直接改这个python上传脚本。

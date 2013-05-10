@@ -1,0 +1,94 @@
+#!/bin/sh
+
+ME="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+MEAT=$(dirname $ME)
+
+
+wget http://www.oberhumer.com/opensource/lzo/download/lzo-2.00.tar.gz
+wget http://openvpn.net/release/openvpn-2.0.9.tar.gz
+wget ftp://ftp.freeradius.org/pub/radius/freeradius-1.1.8.tar.bz2
+wget http://jaist.dl.sourceforge.net/sourceforge/daloradius/daloradius-0.9-8.tar.gz
+wget http://www.nongnu.org/radiusplugin/radiusplugin_v2.0.tar.gz
+#install openvpn
+tar zxvf lzo-2.00.tar.gz
+cd lzo-2.00
+./configure
+make && make install
+cd .. 
+
+
+wget http://swupdate.openvpn.net/community/releases/openvpn-2.1.4.tar.gz
+tar xf openvpn-2.1.4.tar.gz 
+cd openvpn-2.1.4
+./configure
+make && make install
+cd easy-rsa/
+sed -i 's/OpenVPN-TEST/ops@shopex.cn/g' vars
+sed -i 's/me@myhost.mydomain/ops@shopex.cn/g' vars
+. vars
+sh clean-all
+sh build-ca
+sh build-key-server server
+sh build-dh
+/usr/local/sbin/openvpn --genkey --secret ta.key
+mkdir -pv /etc/openvpn
+for item in ca.crt server.crt server.key  dh1024.pem; do cp -v keys/$item /etc/openvpn; done
+cp ta.key /etc/openvpn/
+cd ..
+cd ..
+
+
+wget http://www.nongnu.org/radiusplugin/radiusplugin_v2.1.tar.gz
+tar xf radiusplugin_v2.1.tar.gz 
+cd radiusplugin
+make
+cp radiusplugin.so /etc/openvpn/
+cp radiusplugin.cnf /etc/openvpn/radius.cnf
+
+
+cat  >/etc/openvpn/server.conf<<'EOF'
+port 1194
+proto tcp
+dev tun
+ca /etc/openvpn/ca.crt
+cert /etc/openvpn/server.crt
+key /etc/openvpn/server.key
+dh /etc/openvpn/dh1024.pem
+server 10.99.0.0 255.255.255.0
+ifconfig-pool-persist ipp.txt
+#push "route 192.168.250.0 255.255.255.0"
+#plugin /etc/openvpn/openvpn-auth-pam.so openvpn
+plugin /etc/openvpn/radiusplugin.so /etc/openvpn/radius.cnf
+username-as-common-name
+client-cert-not-required
+client-to-client
+duplicate-cn
+keepalive 10 120
+tls-auth /etc/openvpn/ta.key 0
+comp-lzo
+max-clients 100
+user nobody
+group nobody
+persist-key
+persist-tun
+status openvpn-status.log
+log /var/log/openvpn.log
+log-append /var/log/openvpn.log
+verb 4
+mute 20
+EOF
+
+/usr/local/sbin/openvpn --cd /etc/openvpn --config /etc/openvpn/server.conf &
+
+echo "create database radius;" | mysql -uroot -p
+echo "grant all on radius.* to radius@'localhost' identified by 'www';" | mysql -uroot -p
+mysql -uradius -pwww radius < ./doc/examples/mysql.sql
+
+insert into radgroupreply (groupname,attribute,op,value) values ('user','Auth-Type' , ':=','Local');
+insert into radgroupreply (groupname,attribute,op,value) values ('user','Service-Type','=','Framed-User');
+insert into radgroupreply (groupname,attribute,op,value) values ('user','Framed-IP-Netmask','=','255.255.255.255');
+insert into radgroupreply (groupname,attribute,op,value) values ('user','Framed-IP-Netmask',':=','255.255.255.0');
+INSERT INTO radcheck (UserName, Attribute, Value) VALUES ('test', 'Password', 'test');
+insert into radusergroup(username,groupname) values('test','user');
+
+

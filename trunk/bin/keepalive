@@ -1,0 +1,16 @@
+#!/bin/sh
+PATH=$PATH:/usr/local/bin:/usr/local/sbin:/usr/sbin:/sbin:/home/magic/bin:/usr/local/mysql/bin
+
+admin_site_url="http://mymuzhan.com/index.php/admin/"
+front_site_url=" http://www.koobag.com/customer/account/login/"
+log_file="/var/log/keepalive.log"
+admin_http_code=$(curl -I $admin_site_url | grep "HTTP/1.1" | awk '{print $2}' )
+front_http_code=$(curl -I $front_site_url | grep "HTTP/1.1" | awk '{print $2}' )
+if [ "$admin_http_code" = "503" ] || [ "$front_http_code" = "503"  ]; then
+	/etc/init.d/memcached restart
+	rm -rf /data/httpd/winbag7.com/var/cache/*
+	echo $(date "+%F %T")" restart memcached compeleted $admin_http_code $front_http_code" >> $log_file
+	mail -s "memcached keepalive on "$(hostname)  ken@yiyiee.com < $log_file
+else
+	echo "front http code $front_http_code admin http code $admin_http_code "
+fi

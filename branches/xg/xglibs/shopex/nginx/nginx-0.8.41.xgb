@@ -1,0 +1,128 @@
+#!/bin/bash
+#
+# Xiange Linux build scripts
+
+# Short one-line description of this package.
+DESCRIPTION="Nginx a web server suitable from shopex ecos"
+
+# Homepage, not used by Portage directly but handy for developer reference
+HOMEPAGE="http://nginx.org/"
+
+# Point to any required sources; these will be automatically downloaded by
+# gpkg. 
+# $N = package name, such as autoconf, x-org
+# $V = package version, such as 2.6.10
+
+#SRC_URI="http://foo.bar.com/$N-$V.tar.bz2"
+SRC_URI="http://mirrors.dev.shopex.cn/lnmpp/sources/nginx-0.8.41.tar.gz"
+
+
+# Binary package URI.
+BIN_URI=""
+
+
+# Runtime Depend
+RDEPEND=""
+
+# Build time depend
+DEPEND="${RDEPEND}"
+
+
+
+#init 
+xgb_init()
+{
+    echo "init $N-$V$R build script..."
+    #add web server running user
+    id www > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+    useradd -s /sbin/nologin -M  www
+    fi
+}
+
+#unpack
+xgb_unpack()
+{
+    #unpard file from $XGPATH_SOURCE to current directory.
+    echo "Unpacking to `pwd`"
+    tar xvf $XGPATH_SOURCE/`basename $SRC_URI`
+}
+
+#config
+xgb_config()
+{
+    echo "config $N-$V$R..."
+    #fist, cd build directory
+    cd $N-$V$R
+    
+    #second, add package specified config params to XGB_CONFIG
+    XGB_CONFIG+=" --prefix=/usr/local/nginx \
+    --user=www \
+    --group=www \
+    --with-http_stub_status_module \
+    --with-http_ssl_module \
+    --with-http_gzip_static_module "
+    
+    #Third, call configure with $XGB_CONFIG
+    ./configure $XGB_CONFIG
+}
+
+#build
+xgb_build()
+{
+    echo "make $N-$V$R..."
+    make
+}
+
+#check
+xgb_check()
+{
+    echo "checking $N-$V$R.."
+    #make check
+}
+
+#install
+xgb_install()
+{
+    echo "install to $XGPATH_DEST..."    
+    #install everything to $XGPATH_DEST
+    make DESTDIR=$XGPATH_DEST install        
+    local F_DEST=$XGPATH_DEST/usr/local/nginx
+    #locate self
+    local N_ME_AT=$XGPATH_LIB/$T/$N
+    mkdir -v $F_DEST/conf/vhost
+    cat $N_ME_AT/conf/nginx.conf > $F_DEST/conf/nginx.conf
+    cat $N_ME_AT/conf/deny_admin.conf > $F_DEST/conf/deny_admin.conf
+    cat $N_ME_AT/conf/ecos.conf > $F_DEST/conf/ecos.conf
+    cat $N_ME_AT/conf/ecos_admin.conf > $F_DEST/conf/ecos_admin.conf
+    cat $N_ME_AT/conf/error_pages.conf > $F_DEST/conf/error_pages.conf
+    cat $N_ME_AT/conf/server_flag.conf > $F_DEST/conf/server_flag.conf    
+    cat $N_ME_AT/conf/server.conf > $F_DEST/conf/vhost/default.conf
+    cat $N_ME_AT/conf/status.conf > $F_DEST/conf/vhost/status.conf
+    #self start script
+    mkdir -pv  $XGPATH_DEST/etc/init.d
+    cat $N_ME_AT/conf/nginx.sh > $XGPATH_DEST/etc/init.d/nginx
+    chmod +x $XGPATH_DEST/etc/init.d/nginx
+}
+
+#post install
+xgb_postinst()
+{
+    echo "running after package installed..."
+    mkdir -v /var/log/nginx
+    mkdir -v /data/httpd
+    chkconfig nginx --level 3 on    
+    service nginx start
+}
+
+#pre remove
+xgb_prerm()
+{
+    echo "running before package delete..."
+}
+
+#post remove
+xgb_postrm()
+{
+    echo "running after package delete..."
+}

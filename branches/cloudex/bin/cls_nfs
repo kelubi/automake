@@ -1,0 +1,28 @@
+#!/bin/sh
+
+declare -a closelist
+closelist=(
+cpuspeed 
+cups
+gpm 
+nfslock
+netfs 
+portmap
+rpcgssd 
+rpcidmapd 
+smartd
+xfs 
+avahi-daemon
+)
+
+for((count=0,i=0;count<${#closelist[@]};i++))
+do
+    /sbin/chkconfig --list | grep ${closelist[i]}
+    if [ $? -eq 0 ]; then
+        cmd="/sbin/chkconfig ${closelist[i]} --level 3 off"
+        echo $cmd
+        `$cmd`
+    fi
+    let count+=1
+done
+
