@@ -60,7 +60,9 @@ set_yum_source()
 	grep "CentOS" /etc/issue
 	if [ $? -eq 0 ]; then
   		rpm -Uvh http://apt.sw.be/redhat/el5/en/x86_64/rpmforge/RPMS//rpmforge-release-0.3.6-1.el5.rf.x86_64.rpm
-	fi
+	else
+      rpm -Uvh http://apt.sw.be/redhat/el6/en/x86_64/rpmforge/RPMS/rpmforge-release-0.5.3-1.el6.rf.x86_64.rpm
+  fi
 }
 
 
