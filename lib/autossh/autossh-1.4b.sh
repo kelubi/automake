@@ -36,3 +36,6 @@ make  install
 
 echo "all done"
 
+#usage:
+#autossh -M20000 -f -q -N -D 192.168.1.1:[代理端口] [用户名@你的主机地址]
+#
