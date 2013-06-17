@@ -48,7 +48,7 @@ make  install
 
 PHPINI=$(/usr/local/php/bin/php -i | grep "Loaded Configuration File" | awk -F=\> '{print $2}')
 PHPINI=$(echo $PHPINI;) 
-EXTDIR=$(/usr/local/php/bin/php -i | grep extension_dir | awk -F=\> '{print $2}')
+EXTDIR=$(/usr/local/php/bin/php -i | grep extension_dir | awk -F=\> '{print $2}' | sed -n '1p')
 EXTDIR=$(echo $EXTDIR;)
 if [ -f "$EXTDIR/memcached.so" ]; then
     sed -i '/\[memcached\]/d' $PHPINI
