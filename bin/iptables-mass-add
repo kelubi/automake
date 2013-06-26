@@ -1,0 +1,20 @@
+#!/bin/sh
+PATH=$PATH:/usr/local/bin:/usr/local/sbin:/usr/sbin:/sbin
+
+
+/sbin/iptables-save > /etc/iptables.up.rules.save
+/sbin/iptables-save > /etc/iptables.up.rules
+
+for i in $(netstat -tunlp | grep ^tcp | awk '{print $4}' | awk -F: '{print $2}' | sort -n | uniq | grep -v ^$) ;do  /sbin/iptables -A INPUT -s 192.168.8.0/24 -i eth0 -p tcp -m tcp --dport $i -j ACCEPT
+	/sbin/iptables -A INPUT -s 192.168.43.0/24 -i eth0 -p tcp -m tcp --dport $i -j ACCEPT
+done
+
+for i in $(netstat -tunlp | grep ^udp | awk '{print $4}' | awk -F: '{print $2}' | sort -n | uniq | grep -v ^$) ;do  
+	/sbin/iptables -A INPUT -s 192.168.8.0/24 -i eth0 -p udp -m udp --dport $i -j ACCEPT
+	/sbin/iptables -A INPUT -s 192.168.43.0/24 -i eth0 -p udp -m udp --dport $i -j ACCEPT
+done
+/sbin/iptables -A INPUT -j DROP
+/sbin/iptables-save > /etc/iptables.up.rules
+/sbin/iptables-restore < /etc/iptables.up.rules
+
+exit 0

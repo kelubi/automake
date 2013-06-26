@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# 批量检查工具
+declare -a list
+list=(
+p23.shopex.cn
+p24.shopex.cn
+p25.shopex.cn
+pt01.shopex.cn
+p08.shopex.cn
+p09.shopex.cn
+p14.shopex.cn
+p18.shopex.cn
+p06.shopex.cn
+p104.shopex.cn
+p13.shopex.cn
+p16.shopex.cn
+p21.shopex.cn
+p07.shopex.cn
+p19.shopex.cn
+p27.shopex.cn
+pt02.shopex.cn
+b204.shopex.cn
+)
+
+for((count=0,i=0;count<${#list[@]};i++))
+do
+    item=${list[i]}
+    result=$(dig $item +short | tr "\n" " -> " )
+    echo "$item -> $result";
+    let count+=1
+done
