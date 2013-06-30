@@ -34,10 +34,11 @@ echo "make $N..."
 cd $N-$V$R
 wget http://www.sqlite.org/sqlite-amalgamation-3071300.zip
 unzip sqlite-amalgamation-3071300.zip 
-sqlite-amalgamation
-rm -rf sqlite-amalgamation
+if [ -d sqlite-amalgamation ]; then
+	rm -rf sqlite-amalgamation
+fi
 mv sqlite-amalgamation-3071300 sqlite-amalgamation
-./configure --with-ssl -with-zlib --enable-shared --enable-static --prefix=/usr --with-apr=/usr/local/httpd/apr --with-apr-util=/usr/local/httpd/apr-util --with-apxs=/usr/local/httpd/bin/apxs --with-neon
+./configure LDFLAGS="-L/usr/lib64 -L/lib64"  --with-ssl -with-zlib=/usr --enable-shared --enable-static --prefix=/usr --with-apr=/usr/local/httpd/apr --with-apr-util=/usr/local/httpd/apr-util --with-apxs=/usr/local/httpd/bin/apxs --with-neon 
 echo "make $N-$V$R..."
 CPU_NUM=$(cat /proc/cpuinfo | grep processor | wc -l)
 if [ $CPU_NUM -gt 1 ];then
