@@ -17,7 +17,7 @@ cd /opt/install
 
 if [ -s $PKG_NAME ]; then
   echo "$PKG_NAME [found]"
-  else
+else
   echo "Error: $PKG_NAME not found!!!download now......"
   wget  $SRC_URI
 fi
