@@ -1,0 +1,10 @@
+###############################################################
+# author: ugg
+# mail: ugg.xchj@gmail.com
+# url: http://code.google.com/p/rpmcreate/
+###############################################################
+确保安装rpm_create 的rpm包
+执行
+rpm_create rpmcreatetest.citb
+打包操作
+
